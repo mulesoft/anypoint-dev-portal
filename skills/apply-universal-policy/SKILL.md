@@ -7,14 +7,14 @@ description: |
   my APIs / a provider name / a portfolio slice — JWT validation, rate limiting,
   spike arrest, IP filtering, "what protection do I have", tighten an existing
   policy, or apply one config across providers. DO NOT TRIGGER for a single
-  already-chosen API Manager instance — use skill apply-policy-to-api-instance.
-  Do not use to remove, detach, enable, or disable a policy (those tools do not
-  exist).
+  already-chosen instance that needs a provider-native plugin — use skill
+  apply-native-policy-to-instance. Do not use to remove, detach, enable, or
+  disable a policy (those tools do not exist).
 license: Apache-2.0
 compatibility: Requires the MuleSoft Platform MCP Server (urn:mcp:mulesoft-platform) with list_universal_policies, apply_universal_policy, get_policy_operation_status, and find_assets (include_applied_policies). If those tools are missing, stop.
 metadata:
   author: mulesoft-omni
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # Apply Universal Policy
@@ -39,8 +39,11 @@ IP filtering · IP allowlist · Kong · Apigee · Azure · AWS.
 
 **Do NOT use this skill when:**
 
-- The user already has **one** API Manager instance in context and wants a
-  single native policy on it → **skill apply-policy-to-api-instance**
+- The user already has **one** instance in context and wants a **native**
+  plugin on it (Kong / Apigee / Azure / one MuleSoft instance) →
+  **skill apply-native-policy-to-instance**
+- They are driving **Anypoint REST** rather than MCP →
+  **skill apply-policy-to-api-instance**
 - They need to **create** an instance or deploy a gateway first → **skill secure-api**
 - They want to **remove**, detach, or pause (enable/disable) a policy — say so
   and stop; those actions are not on the tool surface
@@ -174,7 +177,7 @@ Call `apply_universal_policy` once with:
 - `configuration` — the collected config, reused as-is
 
 Do **not** loop `apply_policy_to_instance` for a Universal/canonical template.
-Use that tool only for a provider-native plugin on a single instance.
+That tool is one native plugin on one instance — **skill apply-native-policy-to-instance**.
 
 ### Step 4: Wait until it is actually done (Protect)
 
@@ -206,14 +209,12 @@ apply unless the user asks.
 
 Skip Steps 1–4 unless you still need the instance list from Step 5.
 
-`edit_applied_policy` is **Kong / Apigee / Azure only**. If the instance is
-MuleSoft/Anypoint, say you cannot edit it with the current tools and stop.
-
 There is no bulk-edit: loop **once per instance**.
 
 1. Identify `api_instance_id` + `policy_id` + Exchange
-   `asset.{group_id,asset_id,asset_version}` + `provider` from
-   `view_api_instance_policies` (do not guess).
+   `asset.{group_id,asset_id,asset_version}` + `provider` (and
+   `environment_id` on MuleSoft) from `view_api_instance_policies`
+   (do not guess).
 2. Load the schema with `get_policy_template_form` using those coordinates.
 3. Read current `configurationData`. Merge the requested **delta** into that
    full object (`configuration_data` replaces wholesale — omitted keys are
@@ -221,9 +222,8 @@ There is no bulk-edit: loop **once per instance**.
    re-ask the whole schema when the delta is complete.
 4. Show the **policy → API + instance mapping** of the edit (every instance
    you will loop). **[GATE] Wait for okay.**
-5. Call `edit_applied_policy` per instance. A `success` / 202 is acceptance.
-   Poll `list_instance_policy_operations` per instance until `COMPLETED` /
-   `FAILED`. Confirm per API instance.
+5. Call `edit_applied_policy` per instance (`references/payloads.md`).
+   Confirm per API instance.
 
 A `readOnly: true` policy cannot be edited — say so and stop.
 
@@ -257,17 +257,16 @@ are already terminal. Report from `results`; only `accepted` has an
 full replace. Merge onto the latest `configurationData` immediately before
 the edit.
 
-**Edit failed on a MuleSoft instance:** expected — the tool is external-only.
-Stop and say so.
-
 **User asks to undo / remove / disable the policy:** not supported. There is
 no detach tool and no enable/disable parameter on the agent surface. Explain
 and stop.
 
 ## Related Skills
 
-- **skill apply-policy-to-api-instance**: apply one catalog policy to a single
-  already-chosen API Manager instance (Anypoint REST, not Universal fan-out).
+- **skill apply-native-policy-to-instance**: one native plugin/template on one
+  already-chosen instance (Kong / Apigee / Azure / MuleSoft) via MCP.
+- **skill apply-policy-to-api-instance**: same single-instance job over
+  Anypoint REST (`urn:api:*`), not MCP.
 - **skill secure-api**: create/deploy an instance and then apply a policy —
   use that when the API is not yet an instance.
 - **skill secure-mcp-server**: protect an MCP server, not an API instance.

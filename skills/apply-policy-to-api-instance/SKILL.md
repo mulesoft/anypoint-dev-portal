@@ -306,7 +306,8 @@ After completing all steps, verify the policy is properly applied:
 
 ## Related Jobs
 
-- **skill apply-universal-policy** — Protect a portfolio slice with one Universal (canonical) policy across instances on any gateway. Use that when the user says all / many / my APIs / a named provider, not a single already-chosen API Manager instance.
+- **skill apply-universal-policy** — Protect a portfolio slice with one Universal (canonical) policy across instances on any gateway. Use that when the user says all / many / my APIs / a named provider.
+- **skill apply-native-policy-to-instance** — Apply one native plugin/template to one already-chosen instance via the MuleSoft Platform MCP Server (Kong / Apigee / Azure / MuleSoft).
 - **deploy-api-with-rate-limiting** — Full workflow including API creation and tiered rate limiting with OAuth2
 - **list-organization-api-instances** — Discover existing API instances across environments
 - **manage-consumer-contracts** — Manage client application access after policies are applied

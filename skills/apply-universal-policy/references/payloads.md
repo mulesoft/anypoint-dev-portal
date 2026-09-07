@@ -63,26 +63,15 @@ success. On `FAILED`, read `error.retryable`.
 `not_found` from the status tool means the id is unknown or aged out — say
 so; do not retry with a guessed id.
 
-## `edit_applied_policy` (external only)
+## `edit_applied_policy`
 
-This tool edits native policies on **Kong / Apigee / Azure** only. It
-rejects MuleSoft/Anypoint instances. If the target is MuleSoft, say you
-cannot edit it with the current tools and stop.
+Same tool, two write paths — branch on provider (`references` join first):
 
-Required on every call (do not guess):
+| Instance | `provider` | Also required | After the call |
+| --- | --- | --- | --- |
+| Kong / Apigee / Azure | `kong` / `apigee` / `azure` | `api_instance_id`, `policy_id`, `asset.{group_id,asset_id,asset_version}` | A `success` / 202 is **acceptance**. Poll `list_instance_policy_operations` per instance until `COMPLETED` / `FAILED`. |
+| MuleSoft / Anypoint | omit, or `mulesoft` | `environment_id`, `api_instance_id`, `policy_id`. `asset` optional (forward it to bump version). | Typically synchronous HTTP 200 (`via=apim`). Do **not** poll `list_instance_policy_operations` (that tool is external-only). |
 
-- `organization_id`
-- `api_instance_id`
-- `provider` — `kong` / `apigee` / `azure`
-- `policy_id` — from `view_api_instance_policies`
-- `asset.group_id`, `asset.asset_id`, `asset.asset_version` — Exchange
-  coordinates of the applied template, from the same read
-- `configuration_data` — **full** object. Omitted keys are dropped.
-
-There is no bulk-edit. One user request across many instances = one
-`edit_applied_policy` per instance, same merged config.
-
-A `success` / 202 from the edit is **acceptance**, not completion. Poll
-`list_instance_policy_operations` per instance (`organization_id`,
-`api_instance_id`, `provider`) until that instance's latest update is
-`COMPLETED` or `FAILED`.
+`configuration_data` is a **full** object on both paths. Omitted keys are
+dropped. There is no bulk-edit: one user request across many instances =
+one `edit_applied_policy` per instance, same merged config.
