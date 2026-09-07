@@ -306,7 +306,7 @@ After completing all steps, verify the policy is properly applied:
 
 ## Related Jobs
 
-- **skill apply-universal-policy** — Protect a portfolio slice with one Universal (canonical) policy across instances on any gateway. Use that when the user wants the same protection on many APIs/providers, not a single already-chosen API Manager instance.
+- **skill apply-universal-policy** — Protect a portfolio slice with one Universal (canonical) policy across instances on any gateway. Use that when the user says all / many / my APIs / a named provider, not a single already-chosen API Manager instance.
 - **deploy-api-with-rate-limiting** — Full workflow including API creation and tiered rate limiting with OAuth2
 - **list-organization-api-instances** — Discover existing API instances across environments
 - **manage-consumer-contracts** — Manage client application access after policies are applied
