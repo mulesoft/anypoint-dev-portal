@@ -88,6 +88,13 @@
           "uri": "ui://asset-instance/policy-selector.html"
         },
         {
+          "description": "Interactive login panel for MuleSoft Platform authentication",
+          "mimeType": "text/html;profile=mcp-app",
+          "name": "anypoint-login-ui",
+          "title": "MuleSoft Platform Login",
+          "uri": "ui://auth/login-v2.html"
+        },
+        {
           "description": "Interactive HTML UI for browsing and selecting business groups",
           "mimeType": "text/html;profile=mcp-app",
           "name": "anypoint-business-group-selector-ui",
@@ -6959,6 +6966,71 @@
         {
           "annotations": {
             "destructiveHint": null,
+            "idempotentHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": true,
+            "title": null
+          },
+          "description": "Authenticate with MuleSoft Platform. MUST be called before any other tool. Call WITHOUT arguments to display the interactive login panel where the user enters their credentials. Do NOT ask the user for username/password in the chat.",
+          "inputSchema": {
+            "properties": {
+              "password": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Password"
+              },
+              "username": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Username"
+              }
+            },
+            "title": "loginArguments",
+            "type": "object"
+          },
+          "meta": {
+            "ui": {
+              "resourceUri": "ui://auth/login-v2.html"
+            },
+            "ui/resourceUri": "ui://auth/login-v2.html"
+          },
+          "name": "login",
+          "title": "Login to MuleSoft Platform"
+        },
+        {
+          "annotations": {
+            "destructiveHint": null,
+            "idempotentHint": true,
+            "openWorldHint": null,
+            "readOnlyHint": false,
+            "title": null
+          },
+          "description": "Clear the stored authentication token.",
+          "inputSchema": {
+            "properties": {},
+            "title": "logoutArguments",
+            "type": "object"
+          },
+          "name": "logout",
+          "title": "Logout from MuleSoft Platform"
+        },
+        {
+          "annotations": {
+            "destructiveHint": null,
             "idempotentHint": null,
             "openWorldHint": true,
             "readOnlyHint": false,
@@ -9498,8 +9570,8 @@
         }
       ],
       "totals": {
-        "resources": 29,
-        "tools": 120
+        "resources": 30,
+        "tools": 122
       }
     }
   },
