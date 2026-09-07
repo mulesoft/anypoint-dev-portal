@@ -36,9 +36,9 @@ instance name + the same ✓/✗/? mark.
 
 ## 2. Policy configuration schema
 
-Present the template's full `configurationSchema` (required **and** optional)
-as one table, then ask for **the whole configuration in one shot** — never
-field by field. (Apply path only. Edit path is a delta merge — see the skill.)
+Present `configurationSchema` as one table, then ask for **the whole
+configuration in one shot** against the fields you showed — never field by
+field. (Apply path only. Edit path is a delta merge — see the skill.)
 
 | Field | Description | Required? | Default / allowed values |
 | --- | --- | --- | --- |
@@ -46,7 +46,26 @@ field by field. (Apply path only. Edit path is a delta merge — see the skill.)
 | `skipClientIdValidation` | Skip client-id check | no | `false` |
 
 For nested objects/arrays, indent the child rows under the parent field
-(or flatten with dotted paths). Do not drop optional fields to "simplify".
+(or flatten with dotted paths). Count every child row toward the length
+check below.
+
+**When the schema is short** (about 12 flattened rows or fewer): show
+required **and** optional. Do not hide optionals just to "simplify".
+
+**When the schema is too long to scan** (more than about 12 flattened
+rows): show **required fields only**. Immediately under the table, say
+that optional fields are hidden because the schema is too long, how many
+are hidden, and that they keep their defaults unless the user asks to see
+them. Offer to expand:
+
+> Showing N required fields (M optional hidden — the full schema is too
+> long to display). Say if you want the hidden fields.
+
+If they ask, show the **full** table (required + optional) and let them
+add those values in the same one-shot reply. Do not walk field by field
+either way. Do not invent values for hidden optionals — omit them so
+schema defaults apply. Never hide a required field, even if required
+alone is still long.
 
 ## 3. Policy → API + instance mapping
 

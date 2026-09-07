@@ -94,9 +94,10 @@ Protect, then Audit, then Edit).
 3. **Join before you talk.** `instancesMissingPolicy` is `{instanceId,
    environment}` only. Build display rows and `instance_ids` using
    `references/payloads.md` — do not invent names or providers.
-4. **Apply: one config, whole surface.** Show every field the template schema
-   exposes, then collect the **entire** configuration in one shot. Reuse it
-   across every targeted instance. Never walk field by field.
+4. **Apply: one config, one shot.** Show the schema table (full surface, or
+   required-only when it is too long — see `references/presentation-format.md`),
+   then collect the **entire** configuration for the fields you showed in one
+   reply. Reuse it across every targeted instance. Never walk field by field.
 5. **Wait for completion.** Acceptance (`accepted` / HTTP 202 / edit
    `success`) is not success. Poll until `COMPLETED` or `FAILED`. Distinguish
    retryable vs terminal from `error.retryable`.
@@ -153,8 +154,12 @@ Drop any target instance whose provider is not in `supportedProviders`. If
 that leaves none, say so and stop. Keep the surviving list — that is the
 apply set for Steps 3–4, **not** the raw Step 1 missing list.
 
-Present the **policy configuration schema** table (full surface). Then ask
-the user to fill **all** fields in one reply. Do not invent optional values.
+Present the **policy configuration schema** table
+(`references/presentation-format.md`). If the flattened schema is too long
+to scan, show required fields only, say how many optionals are hidden, and
+offer to expand. Then ask the user to fill the **visible** fields in one
+reply. Do not invent optional values; omitted hidden fields keep schema
+defaults.
 
 ### Step 3: Preview the native mapping, then apply (Protect)
 
