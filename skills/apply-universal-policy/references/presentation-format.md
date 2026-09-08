@@ -38,7 +38,7 @@ instance name + the same ✓/✗/? mark.
 
 Present `configurationSchema` as one table, then ask for **the whole
 configuration in one shot** against the fields you showed — never field by
-field. (Apply path only. Edit path is a delta merge — see the skill.)
+field.
 
 | Field | Description | Required? | Default / allowed values |
 | --- | --- | --- | --- |
@@ -80,22 +80,7 @@ Plain native names from `list_universal_policies` → `providerMapping` (not
 IDs). Join each **remaining** target instance's provider to that mapping
 (after dropping unsupported providers).
 
-## 4. Applied-policy list (audit)
-
-Group by **API, then instance**. Under each instance list policy names (and
-direction / enabled state when the read returns them).
-
-```
-Payments API
-  prod (Production · apigee)
-    - Spike arrest (inbound, enabled)
-  sandbox (Sandbox · apigee)
-    - (none)
-```
-
-When the user named a provider, show **only** that provider's instances.
-
-## 5. Operation result
+## 4. Operation result
 
 One short status line:
 

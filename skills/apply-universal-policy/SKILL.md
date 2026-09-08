@@ -2,19 +2,19 @@
 name: apply-universal-policy
 description: |
   Protect a portfolio slice by applying one Universal (canonical) policy across
-  API instances on any gateway (Kong, Apigee, Azure, AWS, MuleSoft), or audit
-  and edit already-applied native policies. Use when the user says all / many /
-  my APIs / a provider name / a portfolio slice — JWT validation, rate limiting,
-  spike arrest, IP filtering, "what protection do I have", tighten an existing
-  policy, or apply one config across providers. DO NOT TRIGGER for a single
-  already-chosen instance that needs a provider-native plugin — use skill
-  apply-native-policy-to-instance. Do not use to remove, detach, enable, or
-  disable a policy (those tools do not exist).
+  API instances on any gateway (Kong, Apigee, Azure, AWS, MuleSoft). Use when
+  the user says all / many / my APIs / a portfolio slice — JWT validation, rate
+  limiting, spike arrest, IP filtering, or apply one config across providers.
+  DO NOT TRIGGER for "what protection do I have" / listing or editing already-
+  applied native policies — use skill apply-native-policy-to-instance. DO NOT
+  TRIGGER for a single already-chosen instance that needs a provider-native
+  plugin — same skill. Do not use to remove, detach, enable, or disable a
+  policy (those tools do not exist).
 license: Apache-2.0
 compatibility: Requires the MuleSoft Platform MCP Server (urn:mcp:mulesoft-platform) with list_universal_policies, apply_universal_policy, get_policy_operation_status, and find_assets (include_applied_policies). If those tools are missing, stop.
 metadata:
   author: mulesoft-omni
-  version: "1.2.0"
+  version: "1.3.0"
 ---
 
 # Apply Universal Policy
@@ -28,17 +28,17 @@ work has actually finished.
 **Use this skill when the user asks to:**
 
 - "Ensure all my finance-tagged APIs have JWT validation"
-- "What protection do I have on my Apigee APIs?"
-- "Add 1.1.1.1 to the IP filtering on those APIs"
 - Apply one canonical policy (JWT, rate limiting, spike arrest, IP allow/deny)
   across many instances or many providers
 
 **Trigger keywords:** all my APIs · portfolio · missing this policy · universal
-policy · canonical policy · JWT validation · rate limiting · spike arrest ·
-IP filtering · IP allowlist · Kong · Apigee · Azure · AWS.
+policy · canonical policy · JWT validation · rate limiting · spike arrest.
 
 **Do NOT use this skill when:**
 
+- They ask **what protection they already have**, or want to **change** an
+  already-applied native policy ("improve IP filtering to include 1.1.1.1")
+  → **skill apply-native-policy-to-instance** (Audit / Edit)
 - The user already has **one** instance in context and wants a **native**
   plugin on it (Kong / Apigee / Azure / one MuleSoft instance) →
   **skill apply-native-policy-to-instance**
@@ -66,30 +66,22 @@ You must be connected to the MuleSoft Platform MCP Server
 
 - **`references/presentation-format.md`** — pinned tables. Read it when you
   are about to render a user-facing list, schema, mapping, or result.
-- **`references/payloads.md`** — how to join `find_assets` rows, branch on
-  apply `status`, and call `edit_applied_policy`. Read it before the first
-  apply or edit.
+- **`references/payloads.md`** — how to join `find_assets` rows and branch on
+  apply `status`. Read it before the first apply.
 
 ## Workflow
 
 ### Pick the path first
 
-Read the latest user turn and choose **one** path. Do not run Protect steps
-for an Audit or Edit request. Re-pick on every turn (a conversation can
-Protect, then Audit, then Edit).
-
-| Path | When | Go to |
-| --- | --- | --- |
-| **Protect** | A filter + a protection to apply ("JWT on finance APIs") | Steps 1–4 |
-| **Audit** | "What protection / what's applied" with no change yet | Step 5 |
-| **Edit** | Change an already-applied policy ("add 1.1.1.1") | Step 6 |
+This skill is **Protect only**. If the latest turn is "what's applied" or
+"change this native policy", switch to **skill apply-native-policy-to-instance**
+— do not run Steps 1–4.
 
 ### Rules that always apply
 
-1. **Confirm before acting.** Report found/missing (or the edit preview) and
-   wait for an explicit yes before `apply_universal_policy` or
-   `edit_applied_policy`. A missing confirmation writes policies the user did
-   not approve.
+1. **Confirm before acting.** Report found/missing and wait for an explicit
+   yes before `apply_universal_policy`. A missing confirmation writes
+   policies the user did not approve.
 2. **Instances, not APIs.** Users say "APIs"; policies attach to **deployed
    instances**. Gate apply on `policyCoverage` + `instancesMissingPolicy`,
    never on `hasPolicy` alone (`hasPolicy` is any-instance and would skip
@@ -101,9 +93,9 @@ Protect, then Audit, then Edit).
    required-only when it is too long — see `references/presentation-format.md`),
    then collect the **entire** configuration for the fields you showed in one
    reply. Reuse it across every targeted instance. Never walk field by field.
-5. **Wait for completion.** Acceptance (`accepted` / HTTP 202 / edit
-   `success`) is not success. Poll until `COMPLETED` or `FAILED`. Distinguish
-   retryable vs terminal from `error.retryable`.
+5. **Wait for completion.** Acceptance (`accepted` / HTTP 202) is not
+   success. Poll until `COMPLETED` or `FAILED`. Distinguish retryable vs
+   terminal from `error.retryable`.
 6. **Plain names.** Mappings use human-readable native policy names from
    `providerMapping`, not IDs.
 
@@ -193,44 +185,11 @@ Branch on the apply `status` (`references/payloads.md`):
 Then the same **policy → API + instance mapping** as the preview (now as
 the result). On `FAILED`, say whether `error.retryable` is true.
 
-### Step 5: Audit an existing slice
-
-Skip Steps 1–4. Do **not** pass `policy_name_filter`. Do **not** offer to
-apply unless the user asks.
-
-1. `find_assets` with `include_applied_policies=true`, `asset_type=api`,
-   `user_query` verbatim. Put a named provider in `query`, then filter
-   client-side (`references/payloads.md`).
-2. Present the **applied-policy list** (grouped by API, then instance),
-   only the requested provider's instances.
-3. Ask whether they want to change anything. If they do, go to Step 6.
-
-### Step 6: Edit an already-applied native policy
-
-Skip Steps 1–4 unless you still need the instance list from Step 5.
-
-There is no bulk-edit: loop **once per instance**.
-
-1. Identify `api_instance_id` + `policy_id` + Exchange
-   `asset.{group_id,asset_id,asset_version}` + `provider` (and
-   `environment_id` on MuleSoft) from `view_api_instance_policies`
-   (do not guess).
-2. Load the schema with `get_policy_template_form` using those coordinates.
-3. Read current `configurationData`. Merge the requested **delta** into that
-   full object (`configuration_data` replaces wholesale — omitted keys are
-   dropped). Prompt only for required fields the merge left empty — do not
-   re-ask the whole schema when the delta is complete.
-4. Show the **policy → API + instance mapping** of the edit (every instance
-   you will loop). **[GATE] Wait for okay.**
-5. Call `edit_applied_policy` per instance (`references/payloads.md`).
-   Confirm per API instance.
-
-A `readOnly: true` policy cannot be edited — say so and stop.
-
 ## Best Practices
 
-- **Route first.** ✅ Audit stays on Step 5. ❌ running Step 1's
-  `policy_name_filter` + apply GATE because the file is numbered 1–6.
+- **Route first.** ✅ "what's applied" / "change IP filtering" goes to
+  skill apply-native-policy-to-instance. ❌ running Step 1's
+  `policy_name_filter` + apply GATE on an audit turn.
 - **One apply call for Universal.** ✅ `apply_universal_policy` with the
   Step-2 remaining ids. ❌ looping native apply; ❌ sending the pre-drop
   Step 1 list.
@@ -253,18 +212,15 @@ policies. Say so plainly and stop.
 are already terminal. Report from `results`; only `accepted` has an
 `operationId` to poll.
 
-**Edit dropped fields the user did not mention:** `configuration_data` is a
-full replace. Merge onto the latest `configurationData` immediately before
-the edit.
-
 **User asks to undo / remove / disable the policy:** not supported. There is
 no detach tool and no enable/disable parameter on the agent surface. Explain
 and stop.
 
 ## Related Skills
 
-- **skill apply-native-policy-to-instance**: one native plugin/template on one
-  already-chosen instance (Kong / Apigee / Azure / MuleSoft) via MCP.
+- **skill apply-native-policy-to-instance**: list what's applied, edit an
+  already-applied native policy, or apply one native plugin/template to one
+  instance (Kong / Apigee / Azure / MuleSoft) via MCP.
 - **skill apply-policy-to-api-instance**: same single-instance job over
   Anypoint REST (`urn:api:*`), not MCP.
 - **skill secure-api**: create/deploy an instance and then apply a policy —
