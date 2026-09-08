@@ -2,10 +2,10 @@
 name: upgrade-mule-app
 description: Workflow required before any Mule application upgrade work. Call use_skill as your FIRST action — before reading project files (pom.xml, mule-artifact.json) or editing versions yourself — whenever the user asks to upgrade, migrate, bump, modernize, or move a Mule app to a newer Java version, a newer Mule Runtime version, or both. Covers upgrading Java and/or Mule Runtime, getting latest compatible connector versions, updating connector and plugin versions, and fixing impacts from operation changes in flows, DataWeave scripts, and MUnit tests. Even a targeted single-version bump like 'move this app to Java 17' or 'upgrade the runtime to 4.6' requires this workflow — do not hand-edit pom.xml versions and attempt the change yourself. When you call this skill, it must be the only tool call in that response.
 license: Apache-2.0
-compatibility: Requires Anypoint CLI v4 with the `@salesforce/anypoint-cli-dx-mule-plugin` DX plugin, Java 8+, Mule Runtime
+compatibility: Requires Anypoint CLI v4 with the `@salesforce/anypoint-cli-dx-mule-plugin` DX plugin (>= 1.3.0), Java 8+, Mule Runtime
 metadata:
   author: mule-dx-tooling
-  version: "1.0.0"
+  version: "1.0.1"
   cli: anypoint-cli-v4
   theme: professional
 allowed-tools: Bash Read Write Edit AskUserQuestion
@@ -34,6 +34,7 @@ Upgrade Mule applications with automated version updates and end-to-end compatib
 ```bash
 anypoint-cli-v4 --version
 anypoint-cli-v4 dx --help
+anypoint-cli-v4 plugins        # shows the installed DX plugin version
 anypoint-cli-v4 conf
 ```
 
@@ -41,10 +42,18 @@ If tools are missing:
 
 ```bash
 npm install -g @mulesoft/anypoint-cli-v4
-npm install -g @salesforce/anypoint-cli-dx-mule-plugin
+npm install -g @salesforce/anypoint-cli-dx-mule-plugin@latest
 anypoint-cli-v4 conf username <username>
 anypoint-cli-v4 conf password <password>
 ```
+
+**Requires DX Mule plugin `@salesforce/anypoint-cli-dx-mule-plugin` ≥ 1.3.0.** The skill automatically provisions the source and target JDKs during the upgrade via `dx mule jdk download` (Steps 3b and 13), a subcommand that only exists in **1.3.0+**. An older plugin passes the `dx --help` presence check but fails at JDK-download time. `anypoint-cli-v4 plugins` prints the installed version (e.g. `@salesforce/anypoint-cli-dx-mule-plugin 1.3.1`); if it is below 1.3.0, upgrade to the latest:
+
+```bash
+npm install -g @salesforce/anypoint-cli-dx-mule-plugin@latest
+```
+
+Step 1's `validate_prerequisites.mjs` enforces this floor automatically and fails with the upgrade command above.
 
 **Requires:** Mule Runtime **4.3+** and Java **8+**. Apps below either are not supported, upgrade to the baseline first.
 
@@ -61,7 +70,7 @@ This skill ships small Node.js (ESM, zero-dep) scripts under `scripts/`. Invoke 
 
 | Script | Purpose | Output location |
 | --- | --- | --- |
-| `scripts/validate_prerequisites.mjs` | Step 1 — validate app directory (`pom.xml` + `mule-artifact.json`), parent-POM availability (if referenced), Anypoint CLI v4, DX plugin, and local **Maven on the 3.9.x line** (MMP 4.x + MUnit require it; detect-and-instruct, never install). Validation-ONLY; exits non-zero when `errors[]` is non-empty | `tmp/upgrade-prereqs.json` (contains `inAppDir`, `parentDeclared`, `parentFound`, `cliPresent`, `dxPluginPresent`, `mavenVersion`, `mavenInRange`, `errors[]`, ...) |
+| `scripts/validate_prerequisites.mjs` | Step 1 — validate app directory (`pom.xml` + `mule-artifact.json`), parent-POM availability (if referenced), Anypoint CLI v4, **DX plugin ≥ 1.3.0** (version read from `anypoint-cli-v4 plugins`; required for `dx mule jdk download`), and local **Maven on the 3.9.x line** (MMP 4.x + MUnit require it; detect-and-instruct, never install). Validation-ONLY; exits non-zero when `errors[]` is non-empty | `tmp/upgrade-prereqs.json` (contains `inAppDir`, `parentDeclared`, `parentFound`, `cliPresent`, `dxPluginPresent`, `dxPluginVersion`, `dxPluginInRange`, `mavenVersion`, `mavenInRange`, `errors[]`, ...) |
 | `scripts/detect_current_mule_version.mjs` | Step 2a — determine the current Mule Runtime version from the `app.runtime` property, searching the child `pom.xml` then its full local parent chain (parent, grandparent, …) with `${...}` resolved against the merged chain, and flag versions below the supported floor (4.3). `--user-version <v>` persists a user-supplied/corrected value (also flagged via `belowFloor`) | `tmp/current-mule-version.json` (contains `version`, `source`, `resolvedFrom` (`"child"` \| `"parent"` \| `"ancestor"`), `needsUserPrompt`, `belowFloor`, `minSupportedVersion`, `warnings[]`, ...) |
 | `scripts/detect_current_java_version.mjs` | Step 2b — determine the current Java version from `mule-artifact.json` `javaSpecificationVersions`, and flag versions below the supported floor (8). `--user-version <n>` persists a user-supplied/corrected value (also flagged via `belowFloor`) | `tmp/current-java-version.json` (contains `version`, `source`, `supportedVersions`, `needsUserPrompt`, `belowFloor`, `minSupportedVersion`, `warnings[]`, ...) |
 | `scripts/resolve_jdk.mjs` | Step 3 & Phase 2 — ensure a JDK for a given Java **major** is available and report a usable `JAVA_HOME`. Resolves major → full build string (e.g. `8` → `8.0.472_8`) via `dx mule runtime list` (matrix-file fallback), reuses an already-installed JDK under the Anypoint Code Builder java dir, and downloads only when none is present. MAY download (network) unless `--no-download` | `tmp/resolve-jdk-<major>.json` (contains `major`, `requestedBuild`, `javaHome`, `javaBin`, `source`, `downloaded`, `available`, `errors[]`, ...) |
@@ -130,6 +139,7 @@ It writes the validation findings to `tmp/upgrade-prereqs.json` (read fields wit
 - **Not in an app directory** (`pom.xml` / `mule-artifact.json` missing) → tell the user to run from the Mule application root.
 - **An ancestor POM declared but not found locally** → the check walks the **full** `<relativePath>` chain (parent → grandparent → …) and lists each found POM in `ancestorChain[]`, because the whole chain is required for version detection (Step 2/5) and Phase 2 edits (a connector version can live in the grandparent; Steps 14/18 edit and fork every owning ancestor). A missing hop at **any** depth is a hard error here (`parentFound: false` for a missing immediate parent; a deeper miss still populates `errors[]`) — do not let it slip to Step 5. Ask the user to make the missing POM available at a local relative path (resolvable from the declaring POM's `<parent><relativePath>`, or the default `../pom.xml`) and re-run. **Do not attempt to download it.**
 - **Toolchain missing** (`cliPresent` / `dxPluginPresent` false) → point the user at the install commands in Prerequisites.
+- **DX plugin too old** (`dxPluginPresent: true` but `dxPluginInRange: false`) → the installed `@salesforce/anypoint-cli-dx-mule-plugin` (`dxPluginVersion`) is below **1.3.0**, so `dx mule jdk download` (Steps 3b/13) is unavailable. The error names the fix: `npm install -g @salesforce/anypoint-cli-dx-mule-plugin@latest`. Do not proceed until it is upgraded.
 - **Maven not on the 3.9.x line** (`mavenInRange: false`) → MMP 4.x and MUnit require Maven **3.9.x**, and the baseline build (Step 3c) runs on a 4.x MMP. Tell the user to switch to an Apache Maven 3.9.x distribution (put its `bin/` first on `PATH` for this session) and re-run. **Do not download or auto-install Maven, and do not suggest a bare package-manager `install maven`** — those pull whatever is latest (often 4.x, or an old 3.6.x), which fails this very check. Maven is a standard developer toolchain, treated as a pre-req like the CLI/DX plugin.
 
 Only proceed to Step 2 once the script exits zero.

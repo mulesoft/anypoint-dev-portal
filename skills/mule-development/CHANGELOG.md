@@ -4,6 +4,12 @@ All notable changes to `@salesforce/mulesoft-vibes-skills` are documented in thi
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.1] - 2026-09-08
+
+### Changed
+
+- **`upgrade-mule-app`** — Step 1 now enforces a minimum DX Mule plugin version. `validate_prerequisites.mjs` reads the installed `@salesforce/anypoint-cli-dx-mule-plugin` version from `anypoint-cli-v4 plugins` and hard-fails (exit 1) when it is below **1.3.0**, the floor at which `dx mule jdk download` exists — the subcommand the skill uses to auto-provision the source and target JDKs (Steps 3b/13). An older plugin previously passed the `dx --help` presence check and only failed later at JDK-download time; it now stops up front with the fix command (`npm install -g @salesforce/anypoint-cli-dx-mule-plugin@latest`). New output fields `dxPluginVersion` and `dxPluginInRange` in `tmp/upgrade-prereqs.json`.
+
 ## [1.9.0] - 2026-08-27
 
 ### Added

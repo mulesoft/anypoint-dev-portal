@@ -28,7 +28,8 @@
 //
 // Output JSON (file): { ok, inAppDir, pomExists, muleArtifactExists,
 //   parentDeclared, parentFound, parentPath, ancestorChain[], cliPresent,
-//   dxPluginPresent, mavenVersion, mavenInRange, errors[], warnings[], notes[] }.
+//   dxPluginPresent, dxPluginVersion, dxPluginInRange, mavenVersion,
+//   mavenInRange, errors[], warnings[], notes[] }.
 //   ancestorChain[] is every local ancestor POM path (nearest-first) discovered by
 //   walking the full <relativePath> chain; parent{Declared,Found,Path} describe the
 //   immediate parent only (retained for backward compatibility). `ok` is true when
@@ -39,6 +40,17 @@
 const MAVEN_REQUIRED_MAJOR = 3;
 const MAVEN_REQUIRED_MINOR = 9;
 const MAVEN_REQUIRED_LABEL = `${MAVEN_REQUIRED_MAJOR}.${MAVEN_REQUIRED_MINOR}.x`;
+
+// Required DX Mule plugin floor. `dx mule jdk download` — used by resolve_jdk.mjs
+// to auto-provision the source/target JDK (Steps 3b/13) — only exists in
+// @salesforce/anypoint-cli-dx-mule-plugin >= 1.3.0. Older plugins pass the
+// `dx --help` presence check but fail at JDK download time. Detect-and-instruct:
+// fail with the upgrade command, never install.
+const DX_PLUGIN_MIN_MAJOR = 1;
+const DX_PLUGIN_MIN_MINOR = 3;
+const DX_PLUGIN_MIN_PATCH = 0;
+const DX_PLUGIN_MIN_LABEL = `${DX_PLUGIN_MIN_MAJOR}.${DX_PLUGIN_MIN_MINOR}.${DX_PLUGIN_MIN_PATCH}`;
+const DX_PLUGIN_UPGRADE_CMD = "npm install -g @salesforce/anypoint-cli-dx-mule-plugin@latest";
 
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -78,6 +90,26 @@ function isMavenOnRequiredLine(v) {
   return v.major === MAVEN_REQUIRED_MAJOR && v.minor === MAVEN_REQUIRED_MINOR;
 }
 
+// Parse "@salesforce/anypoint-cli-dx-mule-plugin 1.3.1" from `anypoint-cli-v4
+// plugins`. Returns { major, minor, patch, version } or null.
+function parseDxPluginVersion(out) {
+  const m = /@salesforce\/anypoint-cli-dx-mule-plugin\s+v?(\d+)\.(\d+)\.(\d+)/i.exec(out);
+  if (!m) return null;
+  return {
+    major: Number(m[1]),
+    minor: Number(m[2]),
+    patch: Number(m[3]),
+    version: `${m[1]}.${m[2]}.${m[3]}`,
+  };
+}
+
+// True when the parsed DX plugin version is >= the required floor (1.3.0).
+function isDxPluginAtLeastMin(v) {
+  if (v.major !== DX_PLUGIN_MIN_MAJOR) return v.major > DX_PLUGIN_MIN_MAJOR;
+  if (v.minor !== DX_PLUGIN_MIN_MINOR) return v.minor > DX_PLUGIN_MIN_MINOR;
+  return v.patch >= DX_PLUGIN_MIN_PATCH;
+}
+
 function main() {
   const argv = process.argv.slice(2);
   let projectDir = process.cwd();
@@ -99,6 +131,8 @@ function main() {
     ancestorChain: [], // every local ancestor POM path, nearest-first (parent, grandparent, …)
     cliPresent: false,
     dxPluginPresent: false,
+    dxPluginVersion: null,
+    dxPluginInRange: false,
     mavenVersion: null,
     mavenInRange: false,
     errors: [],
@@ -198,9 +232,30 @@ function main() {
     result.dxPluginPresent = dx.ok;
     if (!dx.ok) {
       log("❌ DX plugin not found");
-      result.errors.push("DX plugin not found. Install: npm install -g @salesforce/anypoint-cli-dx-mule-plugin");
+      result.errors.push(`DX plugin not found. Install: ${DX_PLUGIN_UPGRADE_CMD}`);
     } else {
       log("✅ DX plugin found");
+      // Version gate: `dx mule jdk download` (Steps 3b/13, JDK auto-provisioning)
+      // only exists in the plugin >= 1.3.0. Read the version from `plugins`.
+      const plugins = tryExec("anypoint-cli-v4", ["plugins"]);
+      const parsedDx = plugins.ok ? parseDxPluginVersion(plugins.out) : null;
+      if (!parsedDx) {
+        log("⚠️  Could not read DX plugin version from `anypoint-cli-v4 plugins`");
+        result.warnings.push(
+          `Could not determine the @salesforce/anypoint-cli-dx-mule-plugin version. This skill requires >= ${DX_PLUGIN_MIN_LABEL} for \`dx mule jdk download\` (auto-provisions the source/target JDK). If JDK download later fails, upgrade: ${DX_PLUGIN_UPGRADE_CMD}`
+        );
+      } else {
+        result.dxPluginVersion = parsedDx.version;
+        result.dxPluginInRange = isDxPluginAtLeastMin(parsedDx);
+        if (result.dxPluginInRange) {
+          log(`✅ DX plugin ${parsedDx.version} (>= ${DX_PLUGIN_MIN_LABEL})`);
+        } else {
+          log(`❌ DX plugin ${parsedDx.version} is below the required ${DX_PLUGIN_MIN_LABEL}`);
+          result.errors.push(
+            `@salesforce/anypoint-cli-dx-mule-plugin ${parsedDx.version} found, but this skill requires >= ${DX_PLUGIN_MIN_LABEL} for \`dx mule jdk download\` (auto-provisions the source/target JDK in Steps 3b/13). Upgrade: ${DX_PLUGIN_UPGRADE_CMD}`
+          );
+        }
+      }
     }
   }
 
